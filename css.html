@@ -69,18 +69,18 @@
 <canvas id="g"></canvas>
 
 <script>
-// --- ЗВУКИ ---
-const musicMenu = new Audio('C:/Users/Home/Downloads/cs2/3c115da7-8cac-407f-96af-38fba4700d3c (1).mp3');
-const musicLevels = new Audio('C:/Users/Home/Downloads/cs2/1a62c9c6-9fa4-4e81-8b67-1fd9f9df1a4e.mp3');
-const musicWeapon = new Audio('C:/Users/Home/Downloads/cs2/3c115da7-8cac-407f-96af-38fba4700d3c (1).mp3');
-const orcSpawnSnd = new Audio('C:/Users/Home/Downloads/cs2/спавнорка.mp3');
-const orcIdleSnd = new Audio('C:/Users/Home/Downloads/cs2/оркпростокричит.mp3');
-const orcHurtSnd = new Audio('C:/Users/Home/Downloads/cs2/оркубольно.mp3');
-const orcAttackSnd = new Audio('C:/Users/Home/Downloads/cs2/ударорка.mp3');
-const orcDeathSnd = new Audio('C:/Users/Home/Downloads/cs2/гибельорка.mp3');
-const pSounds = [new Audio('C:/Users/Home/Downloads/cs2/звукболиигрока1.mp3'), new Audio('C:/Users/Home/Downloads/cs2/звукболиигрока2.mp3')];
+// --- ЗВУКИ (ИСПРАВЛЕНО ДЛЯ САЙТА) ---
+const musicMenu = new Audio('3c115da7-8cac-407f-96af-38fba4700d3c (1).mp3');
+const musicLevels = new Audio('1a62c9c6-9fa4-4e81-8b67-1fd9f9df1a4e.mp3');
+const musicWeapon = new Audio('3c115da7-8cac-407f-96af-38fba4700d3c (1).mp3');
+const orcSpawnSnd = new Audio('спавнорка.mp3');
+const orcIdleSnd = new Audio('оркпростокричит.mp3');
+const orcHurtSnd = new Audio('оркубольно.mp3');
+const orcAttackSnd = new Audio('ударорка.mp3');
+const orcDeathSnd = new Audio('гибельорка.mp3');
+const pSounds = [new Audio('звукболиигрока1.mp3'), new Audio('звукболиигрока2.mp3')];
 const swordHitSound = new Audio('hit.mp3'); 
-const swordMissSound = new Audio('C:/Users/Home/Downloads/cs2/промах.mp3'); 
+const swordMissSound = new Audio('промах.mp3'); 
 
 [musicMenu, musicLevels, musicWeapon].forEach(m => { m.loop = true; m.volume = 0.4; });
 let currentMusic = null, gameState = 'MENU';
@@ -105,13 +105,13 @@ const canvas = document.getElementById('g');
 const ctx = canvas.getContext('2d', { alpha: false });
 ctx.imageSmoothingEnabled = false;
 
+// ТЕКСТУРЫ (ИСПРАВЛЕНО ДЛЯ САЙТА)
 const wallTex = new Image(); wallTex.src = 'bbq.jpg'; 
 const floorTex = new Image(); floorTex.src = 'доскэ.jpg'; 
-const botTex = new Image(); botTex.src = 'C:/Users/Home/Downloads/cs2/оркк-removebg-preview.png';
-const pillarTex = new Image(); pillarTex.src = 'C:/Users/Home/Downloads/cs2/колоннаимеч-removebg-preview.png';
-const swordTex = new Image(); swordTex.src = 'C:/Users/Home/Downloads/cs2/меч-removebg-preview.png';
+const botTex = new Image(); botTex.src = 'оркк-removebg-preview.png';
+const pillarTex = new Image(); pillarTex.src = 'колоннаимеч-removebg-preview.png';
+const swordTex = new Image(); swordTex.src = 'меч-removebg-preview.png';
 
-// ТВОЯ КАРТА (с удлиненным проходом)
 let map = [
     [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
     [1,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
@@ -165,13 +165,11 @@ canvas.onmousedown = () => {
 function update() {
     if(gameState !== 'GAME' || p.dead) return;
     time += 0.1;
-    // ОРИГИНАЛЬНАЯ ФИЗИКА МЫШИ
     p.dir += (p.tDir-p.dir)*0.15; p.vDir += (p.tVDir-p.vDir)*0.15;
     
     if(keys.Space && p.z >= 0) p.vz = 0.12; 
     p.z += p.vz; if(p.z > 0) p.vz -= 0.008; else { p.z = 0; p.vz = 0; }
     
-    // ПРОВЕРКА МЕЧА
     if(keys.KeyE && altar.active) {
         if(Math.sqrt((altar.x-p.x)**2+(altar.y-p.y)**2) < 1.5) {
             altar.active = false; p.hasSword = true;
