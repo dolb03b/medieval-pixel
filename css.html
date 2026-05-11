@@ -2,11 +2,10 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Medieval Combat: Clean Sound Edition</title>
+    <title>Medieval Combat: Original Physics</title>
     <style>
         body { margin: 0; background: #000; overflow: hidden; font-family: 'Courier New', monospace; }
         canvas { display: block; width: 100vw; height: 100vh; image-rendering: pixelated; }
-        
         #menu-overlay, #levels-screen, #weapon-screen {
             position: absolute; inset: 0; background: black;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -20,18 +19,15 @@
         }
         .menu-btn:hover { background: white; color: black; }
         .hidden { display: none !important; }
-
         #ui { position: absolute; top: 20px; left: 20px; color: #ff0000; text-shadow: 2px 2px #000; font-size: 24px; pointer-events: none; z-index: 10; display: none; }
-        #msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 20px; text-align: center; display: none; text-shadow: 2px 2px #000; font-weight: bold; }
-        
+        #msg { position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); color: white; font-size: 18px; text-align: center; display: none; text-shadow: 2px 2px #000; background: rgba(0,0,0,0.5); padding: 10px; }
         #hotbar { 
             position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); 
             display: none; gap: 10px; background: rgba(0, 0, 0, 0.8); 
             padding: 8px; border: 2px solid #555; border-radius: 4px; z-index: 10; 
         }
-        .slot { width: 50px; height: 50px; border: 2px solid #444; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; position: relative; }
+        .slot { width: 50px; height: 50px; border: 2px solid #444; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; }
         .slot.active { border-color: #ff0000; background: rgba(255, 0, 0, 0.4); box-shadow: 0 0 15px red; }
-        
         #death { 
             position: absolute; inset: 0; background: rgba(50,0,0,0.95); 
             color: white; display: none; flex-direction: column; 
@@ -56,12 +52,12 @@
 
 <div id="weapon-screen" class="hidden">
     <div class="menu-title">АРСЕНАЛ</div>
-    <p>МЕЧ СТРАННИКА (АКТИВНО)</p>
+    <p>МЕЧ СТРАННИКА (ВЫБРАНО)</p>
     <button class="menu-btn" onclick="backToMenu()">НАЗАД</button>
 </div>
 
 <div id="ui">HP: <span id="hp">100</span></div>
-<div id="msg">Нажми [E], чтобы забрать меч</div>
+<div id="msg">Найди выход из склепа и забери свой меч...</div>
 <div id="hotbar">
     <div class="slot active" id="s1"></div>
     <div class="slot" id="s2"></div>
@@ -73,89 +69,38 @@
 <canvas id="g"></canvas>
 
 <script>
-// --- КОНФИГУРАЦИЯ ЗВУКОВ ---
+// --- ЗВУКИ ---
 const musicMenu = new Audio('C:/Users/Home/Downloads/cs2/3c115da7-8cac-407f-96af-38fba4700d3c (1).mp3');
 const musicLevels = new Audio('C:/Users/Home/Downloads/cs2/1a62c9c6-9fa4-4e81-8b67-1fd9f9df1a4e.mp3');
 const musicWeapon = new Audio('C:/Users/Home/Downloads/cs2/3c115da7-8cac-407f-96af-38fba4700d3c (1).mp3');
-
 const orcSpawnSnd = new Audio('C:/Users/Home/Downloads/cs2/спавнорка.mp3');
 const orcIdleSnd = new Audio('C:/Users/Home/Downloads/cs2/оркпростокричит.mp3');
 const orcHurtSnd = new Audio('C:/Users/Home/Downloads/cs2/оркубольно.mp3');
 const orcAttackSnd = new Audio('C:/Users/Home/Downloads/cs2/ударорка.mp3');
 const orcDeathSnd = new Audio('C:/Users/Home/Downloads/cs2/гибельорка.mp3');
-
-const playerHurtSnd1 = new Audio('C:/Users/Home/Downloads/cs2/звукболиигрока1.mp3');
-const playerHurtSnd2 = new Audio('C:/Users/Home/Downloads/cs2/звукболиигрока2.mp3');
-const playerHurtSounds = [playerHurtSnd1, playerHurtSnd2];
-
+const pSounds = [new Audio('C:/Users/Home/Downloads/cs2/звукболиигрока1.mp3'), new Audio('C:/Users/Home/Downloads/cs2/звукболиигрока2.mp3')];
 const swordHitSound = new Audio('hit.mp3'); 
 const swordMissSound = new Audio('C:/Users/Home/Downloads/cs2/промах.mp3'); 
 
 [musicMenu, musicLevels, musicWeapon].forEach(m => { m.loop = true; m.volume = 0.4; });
+let currentMusic = null, gameState = 'MENU';
 
-let currentMusic = null;
-let gameState = 'MENU';
+function playSndSingle(snd, vol = 0.5) { if (!snd.paused) return; snd.currentTime = 0; snd.volume = vol; snd.play().catch(() => {}); }
+function playPlayerHurt() { if (pSounds.some(s => !s.paused)) return; let s = pSounds[Math.floor(Math.random() * pSounds.length)]; s.currentTime = 0; s.volume = 0.7; s.play().catch(() => {}); }
 
-// ФУНКЦИЯ ДЛЯ ПРЕДОТВРАЩЕНИЯ СТАКА ЗВУКОВ
-function playSndSingle(snd, vol = 0.5) {
-    if (!snd.paused) return; // Если звук еще играет, выходим
-    snd.currentTime = 0;
-    snd.volume = vol;
-    snd.play().catch(() => {});
+function playMenuMusic(target) { if (currentMusic) { currentMusic.pause(); currentMusic.currentTime = 0; } currentMusic = target; currentMusic.play().catch(() => {}); }
+window.addEventListener('click', () => { if (!currentMusic && gameState === 'MENU') playMenuMusic(musicMenu); }, { once: true });
+
+function showLevels() { document.getElementById('menu-overlay').classList.add('hidden'); document.getElementById('levels-screen').classList.remove('hidden'); playMenuMusic(musicLevels); }
+function showWeapon() { document.getElementById('menu-overlay').classList.add('hidden'); document.getElementById('weapon-screen').classList.remove('hidden'); playMenuMusic(musicWeapon); }
+function backToMenu() { document.getElementById('levels-screen').classList.add('hidden'); document.getElementById('weapon-screen').classList.add('hidden'); document.getElementById('menu-overlay').classList.remove('hidden'); playMenuMusic(musicMenu); }
+function startGame() { 
+    document.getElementById('levels-screen').classList.add('hidden'); document.getElementById('ui').style.display = 'block'; 
+    document.getElementById('hotbar').style.display = 'flex'; document.getElementById('msg').style.display = 'block';
+    setTimeout(() => { document.getElementById('msg').style.display = 'none'; }, 5000);
+    if (currentMusic) currentMusic.pause(); canvas.requestPointerLock(); gameState = 'GAME'; 
 }
 
-// Специальная версия для боли игрока (так как там массив)
-function playPlayerHurt() {
-    // Проверяем, играет ли какой-либо из звуков боли
-    let isPlaying = playerHurtSounds.some(s => !s.paused);
-    if (isPlaying) return;
-
-    let randomHurt = playerHurtSounds[Math.floor(Math.random() * playerHurtSounds.length)];
-    randomHurt.currentTime = 0;
-    randomHurt.volume = 0.7;
-    randomHurt.play().catch(() => {});
-}
-
-// --- УПРАВЛЕНИЕ МЕНЮ ---
-function playMenuMusic(targetMusic) {
-    if (currentMusic) { currentMusic.pause(); currentMusic.currentTime = 0; }
-    currentMusic = targetMusic;
-    currentMusic.play().catch(() => {});
-}
-
-window.addEventListener('click', () => {
-    if (!currentMusic && gameState === 'MENU') playMenuMusic(musicMenu);
-}, { once: true });
-
-function showLevels() {
-    document.getElementById('menu-overlay').classList.add('hidden');
-    document.getElementById('levels-screen').classList.remove('hidden');
-    playMenuMusic(musicLevels);
-}
-
-function showWeapon() {
-    document.getElementById('menu-overlay').classList.add('hidden');
-    document.getElementById('weapon-screen').classList.remove('hidden');
-    playMenuMusic(musicWeapon);
-}
-
-function backToMenu() {
-    document.getElementById('levels-screen').classList.add('hidden');
-    document.getElementById('weapon-screen').classList.add('hidden');
-    document.getElementById('menu-overlay').classList.remove('hidden');
-    playMenuMusic(musicMenu);
-}
-
-function startGame() {
-    document.getElementById('levels-screen').classList.add('hidden');
-    document.getElementById('ui').style.display = 'block';
-    document.getElementById('hotbar').style.display = 'flex';
-    if (currentMusic) currentMusic.pause();
-    canvas.requestPointerLock();
-    gameState = 'GAME';
-}
-
-// --- ЯДРО ИГРЫ ---
 const canvas = document.getElementById('g');
 const ctx = canvas.getContext('2d', { alpha: false });
 ctx.imageSmoothingEnabled = false;
@@ -166,72 +111,29 @@ const botTex = new Image(); botTex.src = 'C:/Users/Home/Downloads/cs2/оркк-r
 const pillarTex = new Image(); pillarTex.src = 'C:/Users/Home/Downloads/cs2/колоннаимеч-removebg-preview.png';
 const swordTex = new Image(); swordTex.src = 'C:/Users/Home/Downloads/cs2/меч-removebg-preview.png';
 
+// ТВОЯ КАРТА (с удлиненным проходом)
 let map = [
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,1],
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
 ];
 
 let bots = [], keys = {}, attackCD = 0, slashAnim = 0, shake = 0, time = 0;
-let p = { x: 3, y: 2.5, dir: 0, vDir: 0, tDir: 0, tVDir: 0, hp: 100, z: 0, vz: 0, dead: false, slot: 1, hasSword: false };
-let altar = { x: 10, y: 2.5, active: true };
+let p = { x: 2, y: 2.5, dir: 0, vDir: 0, tDir: 0, tVDir: 0, hp: 100, z: 0, vz: 0, dead: false, hasSword: false };
+let altar = { x: 27, y: 2.5, active: true };
+let wave2 = false;
 
-function spawn(count) {
-    bots = [];
+function spawn(coords) {
     playSndSingle(orcSpawnSnd, 0.7);
-    for(let i=0; i<count; i++) {
-        bots.push({ 
-            x: 14 + Math.random()*4, y: 1.5 + Math.random()*2, 
-            hp: 120, maxHp: 120, dead: false, lt: 0, 
-            z: 0, vz: 0, flash: 0, 
-            walkCycle: Math.random() * 10 
-        });
-    }
+    coords.forEach(c => {
+        bots.push({ x: c.x, y: c.y, hp: 120, maxHp: 120, dead: false, lt: 0, z: 0, vz: 0, flash: 0, walkCycle: Math.random()*10 });
+    });
 }
 
-function updateHotbarUI() {
-    for(let i=1; i<=4; i++) document.getElementById('s'+i).classList.toggle('active', p.slot === i);
-}
-
-window.onkeydown = e => { 
-    if(gameState !== 'GAME') return;
-    keys[e.code] = true; 
-    if(e.code === 'Digit1') { p.slot = 1; updateHotbarUI(); }
-    if(e.code === 'Digit2') { p.slot = 2; updateHotbarUI(); }
-    if(e.code === 'Digit3') { p.slot = 3; updateHotbarUI(); }
-    if(e.code === 'Digit4') { p.slot = 4; updateHotbarUI(); }
-    if(e.code==='Space' && p.z >= 0) p.vz = 0.12; 
-    if(e.code === 'KeyE' && altar.active) {
-        let dist = Math.sqrt((altar.x - p.x)**2 + (altar.y - p.y)**2);
-        if(dist < 1.5) { altar.active = false; p.hasSword = true; document.getElementById('s1').innerText = "🗡️"; spawn(6); }
-    }
-};
+window.onkeydown = e => { if(gameState === 'GAME') keys[e.code] = true; };
 window.onkeyup = e => keys[e.code] = false;
-
-canvas.onmousedown = () => {
-    if(gameState !== 'GAME' || p.dead) return;
-    if(document.pointerLockElement !== canvas) canvas.requestPointerLock();
-    else if(p.hasSword && p.slot === 1 && attackCD <= 0) {
-        attackCD = 22; slashAnim = 15;
-        let target = null, minDist = 2.2;
-        bots.forEach(b => {
-            if(b.dead) return;
-            let d = Math.sqrt((b.x-p.x)**2 + (b.y-p.y)**2), ang = Math.atan2(b.y-p.y, b.x-p.x) - p.dir;
-            while(ang < -Math.PI) ang += Math.PI*2; while(ang > Math.PI) ang -= Math.PI*2;
-            if(d < minDist && Math.abs(ang) < 0.6) { minDist = d; target = b; }
-        });
-        if(target) {
-            playSndSingle(swordHitSound);
-            playSndSingle(orcHurtSnd, 0.6);
-            target.hp -= 40; target.vz = 0.08; target.flash = 6;
-            target.x += Math.cos(p.dir) * 0.3; target.y += Math.sin(p.dir) * 0.3;
-            shake = 6;
-            if(target.hp <= 0) { target.dead = true; playSndSingle(orcDeathSnd, 0.7); }
-        } else playSndSingle(swordMissSound);
-    }
-};
 
 window.onmousemove = e => { 
     if(gameState === 'GAME' && document.pointerLockElement===canvas) { 
@@ -240,20 +142,53 @@ window.onmousemove = e => {
     } 
 };
 
+canvas.onmousedown = () => {
+    if(gameState !== 'GAME' || p.dead || !p.hasSword) return;
+    if(document.pointerLockElement !== canvas) canvas.requestPointerLock();
+    else if(attackCD <= 0) {
+        attackCD = 20; slashAnim = 15;
+        let target = null, minDist = 2.2;
+        bots.forEach(b => {
+            if(b.dead) return;
+            let d = Math.sqrt((b.x-p.x)**2 + (b.y-p.y)**2), ang = Math.atan2(b.y-p.y, b.x-p.x) - p.dir;
+            while(ang < -Math.PI) ang += Math.PI*2; while(ang > Math.PI) ang -= Math.PI*2;
+            if(d < minDist && Math.abs(ang) < 0.6) { minDist = d; target = b; }
+        });
+        if(target) {
+            playSndSingle(swordHitSound); playSndSingle(orcHurtSnd, 0.6);
+            target.hp -= 40; target.vz = 0.08; target.flash = 6;
+            shake = 6; if(target.hp <= 0) { target.dead = true; playSndSingle(orcDeathSnd, 0.7); }
+        } else playSndSingle(swordMissSound);
+    }
+};
+
 function update() {
     if(gameState !== 'GAME' || p.dead) return;
     time += 0.1;
+    // ОРИГИНАЛЬНАЯ ФИЗИКА МЫШИ
     p.dir += (p.tDir-p.dir)*0.15; p.vDir += (p.tVDir-p.vDir)*0.15;
-    let floorZ = (map[Math.floor(p.y)] && map[Math.floor(p.y)][Math.floor(p.x)] === 0) ? 0 : -20; 
-    p.z += p.vz; if(p.z > floorZ) p.vz -= 0.008; else if(floorZ === 0) { p.z = 0; p.vz = 0; }
     
+    if(keys.Space && p.z >= 0) p.vz = 0.12; 
+    p.z += p.vz; if(p.z > 0) p.vz -= 0.008; else { p.z = 0; p.vz = 0; }
+    
+    // ПРОВЕРКА МЕЧА
+    if(keys.KeyE && altar.active) {
+        if(Math.sqrt((altar.x-p.x)**2+(altar.y-p.y)**2) < 1.5) {
+            altar.active = false; p.hasSword = true;
+            document.getElementById('s1').innerText = "🗡️";
+            spawn([{x: 5, y: 2.2}, {x: 5, y: 2.8}, {x: 24, y: 2.2}, {x: 24, y: 2.8}]);
+        }
+    }
+
     let spd = 0.05, nx = p.x, ny = p.y;
     if(keys.KeyW){ nx += Math.cos(p.dir)*spd; ny += Math.sin(p.dir)*spd; }
     if(keys.KeyS){ nx -= Math.cos(p.dir)*spd; ny -= Math.sin(p.dir)*spd; }
     if(keys.KeyA){ nx += Math.cos(p.dir-1.57)*spd; ny += Math.sin(p.dir-1.57)*spd; }
     if(keys.KeyD){ nx += Math.cos(p.dir+1.57)*spd; ny += Math.sin(p.dir+1.57)*spd; }
-    if(!map[Math.floor(ny)] || map[Math.floor(ny)][Math.floor(nx)] !== 1) { p.x = nx; p.y = ny; }
-    
+    if(map[Math.floor(ny)] && map[Math.floor(ny)][Math.floor(nx)] === 0) { p.x = nx; p.y = ny; }
+
+    if(!wave2 && p.x > 25) { wave2 = true; spawn([{x:26,y:3.5},{x:29,y:3.5},{x:26,y:3.2},{x:29,y:3.8}]); }
+
     if(attackCD > 0) attackCD--; if(slashAnim > 0) slashAnim--;
     if(shake > 0) shake *= 0.85;
 
@@ -261,100 +196,75 @@ function update() {
         if(b.dead) return;
         if(b.flash > 0) b.flash--;
         b.z += b.vz; if(b.z > 0) b.vz -= 0.01; else b.z = 0;
-        
-        // Рандомный крик орка (без наслоения)
-        if(Math.random() < 0.003) { playSndSingle(orcIdleSnd, 0.2); }
-
         let d = Math.sqrt((p.x-b.x)**2 + (p.y-b.y)**2);
-        if(d < 0.7) { 
-            if(Date.now()-b.lt > 2000){ 
-                p.hp -= 10; shake = 10; 
-                playSndSingle(orcAttackSnd, 0.6); // Звук удара орка (без наслоения)
-                playPlayerHurt(); // Звук боли игрока (без наслоения)
-                b.lt = Date.now(); 
-            } 
-        } else { 
-            b.x += (p.x-b.x)/d*0.018; b.y += (p.y-b.y)/d*0.018; 
+        if(d < 0.7) { if(Date.now()-b.lt > 1800){ p.hp -= 10; shake = 10; playSndSingle(orcAttackSnd, 0.6); playPlayerHurt(); b.lt = Date.now(); } }
+        else if(d < 12) { 
+            let mx = (p.x-b.x)/d*0.02, my = (p.y-b.y)/d*0.02;
+            if(map[Math.floor(b.y+my)][Math.floor(b.x+mx)] === 0) { b.x += mx; b.y += my; }
             b.walkCycle += 0.2; 
         }
     });
-    if(p.hp <= 0 && !p.dead) { p.dead = true; document.getElementById('death').style.display='flex'; }
+    if(p.hp <= 0) { p.dead = true; document.getElementById('death').style.display='flex'; }
     document.getElementById('hp').innerText = Math.max(0, p.hp);
 }
 
 function draw() {
     if(gameState !== 'GAME') return;
     const w = canvas.width = window.innerWidth/3, h = canvas.height = window.innerHeight/3;
-    const fov = 0.8, jumpOffset = p.z*60, halfH = h/2 + p.vDir + jumpOffset;
+    const fov = 0.8, jump = p.z*60, hH = h/2 + p.vDir + jump;
     let zB = new Array(w).fill(50);
-    
     ctx.setTransform(1,0,0,1,(Math.random()-0.5)*shake,(Math.random()-0.5)*shake);
-    ctx.fillStyle = "#1a0000"; ctx.fillRect(-10,-10,w+20,h+20);
+    ctx.fillStyle = "#1a0e0e"; ctx.fillRect(-10,-10,w+20,h+20);
     
     if(floorTex.complete) {
-        for(let y=Math.floor(halfH); y<h; y+=4) {
-            let dist = (h*0.4)/(y-halfH);
+        for(let y=Math.floor(hH); y<h; y+=4) {
+            let dist = (h*0.4)/(y-hH);
             for(let x=0; x<w; x+=8) {
-                let fx = p.x + Math.cos(p.dir+((x/w)-0.5)*fov)*dist, fy = p.y + Math.sin(p.dir+((x/w)-0.5)*fov)*dist;
-                ctx.drawImage(floorTex, Math.abs(fx*64)%floorTex.width, Math.abs(fy*64)%floorTex.height, 1, 1, x, y, 8, 4);
+                let ang = p.dir+((x/w)-0.5)*fov;
+                let fx = p.x + Math.cos(ang)*dist, fy = p.y + Math.sin(ang)*dist;
+                ctx.drawImage(floorTex, Math.abs(fx*64)%64, Math.abs(fy*64)%64, 1, 1, x, y, 8, 4);
             }
         }
     }
 
     for(let i=0; i<w; i++) {
-        let ang = (p.dir - fov/2) + (i/w) * fov, d = 0;
+        let ang = (p.dir - fov/2) + (i/w)*fov, d = 0;
         while(d < 15) {
             d += 0.05; let rx = Math.floor(p.x + Math.cos(ang)*d), ry = Math.floor(p.y + Math.sin(ang)*d);
             if(map[ry] && map[ry][rx] === 1) {
                 let dep = d * Math.cos(ang - p.dir); zB[i] = dep;
-                let wh = h / dep, tx = ((p.x+Math.cos(ang)*d) + (p.y+Math.sin(ang)*d)) % 1 * wallTex.width;
-                ctx.drawImage(wallTex, tx, 0, 1, wallTex.height, i, (h-wh)/2+p.vDir+jumpOffset, 1, wh); break;
+                let wh = h/dep;
+                ctx.drawImage(wallTex, ((p.x+Math.cos(ang)*d)+(p.y+Math.sin(ang)*d))%1*wallTex.width, 0, 1, wallTex.height, i, (h-wh)/2+p.vDir+jump, 1, wh);
+                break;
             }
         }
     }
 
     let sprites = [];
     if(altar.active) sprites.push({x: altar.x, y: altar.y, tex: pillarTex, s: 1.2});
-    bots.forEach(b => { 
-        if(!b.dead) {
-            let bob = Math.sin(b.walkCycle) * 0.05;
-            let breath = Math.sin(time * 0.5) * 0.02;
-            sprites.push({x: b.x, y: b.y, z: b.z + bob, hp: b.hp, maxHp: b.maxHp, tex: botTex, s: 0.8 + breath, isBot: true, flash: b.flash}); 
-        }
-    });
-
+    bots.forEach(b => { if(!b.dead) sprites.push({x: b.x, y: b.y, z: b.z + Math.sin(b.walkCycle)*0.05, hp: b.hp, maxHp: b.maxHp, tex: botTex, s: 0.8, isBot: true, flash: b.flash}); });
     sprites.sort((a,b)=>((b.x-p.x)**2+(b.y-p.y)**2) - ((a.x-p.x)**2+(a.y-p.y)**2)).forEach(s => {
         let dx=s.x-p.x, dy=s.y-p.y, d=Math.sqrt(dx*dx+dy*dy), ang = Math.atan2(dy,dx)-p.dir;
         while(ang < -Math.PI) ang += Math.PI*2; while(ang > Math.PI) ang -= Math.PI*2;
         if(Math.abs(ang) < fov) {
-            let sx = (ang/fov+0.5)*w, bh = h/(d*Math.cos(ang))*s.s, sy = (h-bh)/2+p.vDir+jumpOffset-((s.z||0)*bh);
+            let sx = (ang/fov+0.5)*w, bh = h/(d*Math.cos(ang))*s.s, sy = (h-bh)/2+p.vDir+jump-((s.z||0)*bh);
             if(d < zB[Math.floor(sx)]) {
-                ctx.fillStyle = "rgba(0,0,0,0.3)";
-                ctx.beginPath(); ctx.ellipse(sx, (h-bh)/2+p.vDir+jumpOffset+bh*0.9, bh/4, bh/10, 0, 0, Math.PI*2); ctx.fill();
-                if(s.flash > 0) ctx.filter = "brightness(5) contrast(2)";
-                ctx.drawImage(s.tex, sx-bh/2, sy, bh, bh); 
-                ctx.filter = "none";
-                if(s.isBot) { ctx.fillStyle = "#300"; ctx.fillRect(sx-bh/4, sy-8, bh/2, 3); ctx.fillStyle = "#f00"; ctx.fillRect(sx-bh/4, sy-8, (bh/2)*(s.hp/s.maxHp), 3); }
+                if(s.flash > 0) ctx.filter = "brightness(5)";
+                ctx.drawImage(s.tex, sx-bh/2, sy, bh, bh); ctx.filter = "none";
+                if(s.isBot) { ctx.fillStyle = "#f00"; ctx.fillRect(sx-bh/4, sy-8, (bh/2)*(s.hp/s.maxHp), 3); }
             }
         }
     });
 
-    if(p.hasSword && p.slot === 1) {
+    if(p.hasSword) {
         ctx.save(); let sw = h/2.5; 
-        let attackY = attackCD > 0 ? (22 - attackCD) * 3 : Math.sin(time*0.2)*2;
-        ctx.translate(w/2 + 35, h - sw/1.2 + attackY); ctx.rotate(-0.3 + (attackCD > 0 ? (22-attackCD)*0.15 : 0));
+        let attackY = attackCD > 0 ? (20 - attackCD) * 3 : Math.sin(time*0.2)*2;
+        ctx.translate(w/2 + 35, h - sw/1.2 + attackY); ctx.rotate(-0.3 + (attackCD > 0 ? (20-attackCD)*0.15 : 0));
         ctx.drawImage(swordTex, -sw/2, -sw/2, sw, sw); ctx.restore();
     }
-    
-    if(slashAnim > 0) {
-        ctx.beginPath(); ctx.strokeStyle = `rgba(255, 255, 255, ${slashAnim / 15})`; ctx.lineWidth = 3;
-        ctx.arc(w/2, h/2 + 10, 35, -0.2, 0.8); ctx.stroke();
-    }
-
-    ctx.setTransform(1,0,0,1,0,0);
-    ctx.fillStyle = "white"; ctx.fillRect(w/2-1, h/2-1, 2, 2);
+    if(slashAnim > 0) { ctx.beginPath(); ctx.strokeStyle = `rgba(255, 255, 255, ${slashAnim / 15})`; ctx.lineWidth = 3; ctx.arc(w/2, h/2 + 10, 35, -0.2, 0.8); ctx.stroke(); }
+    ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle = "white"; ctx.fillRect(w/2-1, h/2-1, 2, 2);
 }
-
 function loop(){ update(); draw(); requestAnimationFrame(loop); }
 loop();
 </script>
